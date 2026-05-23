@@ -235,6 +235,12 @@ class ControlRoom(Room):
             cmd.add_argument("--allow-domain", help="restrict previews to this domain (repeatable)", action="append")
             cmd.add_argument("--remove-domain", help="remove a domain from the allowlist", action="append")
             cmd.add_argument("--clear-domains", action="store_true", help="clear the domain allowlist (allow all)")
+            cmd.add_argument(
+                "--user-agent",
+                help="override the HTTP User-Agent used when fetching previews (some sites only serve"
+                " OpenGraph tags to known crawler UAs)",
+            )
+            cmd.add_argument("--reset-user-agent", action="store_true", help="restore the default User-Agent")
             self.commands.register(cmd, self.cmd_urlpreview)
 
             cmd = CommandParser(prog="VERSION", description="show bridge version")
@@ -662,6 +668,12 @@ class ControlRoom(Room):
             if d in domains:
                 domains.remove(d)
                 changed = True
+        if args.reset_user_agent:
+            self.serv.config["url_preview_user_agent"] = None
+            changed = True
+        elif args.user_agent is not None:
+            self.serv.config["url_preview_user_agent"] = args.user_agent
+            changed = True
 
         if changed:
             self.serv.config["url_preview_domains"] = domains
@@ -669,14 +681,18 @@ class ControlRoom(Room):
             # rebuild the fetcher so changes take effect immediately
             self.serv.init_url_preview_fetcher()
 
+        from heisenbridge.url_preview import DEFAULT_USER_AGENT
+
         enabled = self.serv.config.get("url_previews")
         embed = self.serv.config.get("url_preview_embed_media", True)
+        ua = self.serv.config.get("url_preview_user_agent") or DEFAULT_USER_AGENT
         self.send_notice(f"URL previews are {'enabled' if enabled else 'disabled'}.")
         self.send_notice(f"Inline media embedding is {'enabled' if embed else 'disabled'}.")
         if domains:
             self.send_notice(f"Allowed domains: {', '.join(domains)}")
         else:
             self.send_notice("Allowed domains: all")
+        self.send_notice(f"User-Agent: {ua}")
 
     async def cmd_open(self, args):
         networks = self.networks()

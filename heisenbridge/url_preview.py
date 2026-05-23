@@ -42,7 +42,13 @@ DEFAULT_MAX_IMAGE_BYTES = 8 * 1024 * 1024
 DEFAULT_MAX_MEDIA_BYTES = 50 * 1024 * 1024
 DEFAULT_CACHE_TTL = 30 * 60
 DEFAULT_CACHE_MAX_ENTRIES = 256
-DEFAULT_USER_AGENT = "heisenbridge-url-preview/1 (+https://github.com/hifi/heisenbridge)"
+# Many large sites (YouTube, Twitter/X, Instagram, ...) only serve the
+# lightweight server-rendered page with OpenGraph tags near the top of <head>
+# to recognised link-preview crawlers; an unknown User-Agent gets the heavy
+# JS-app variant where og: tags are buried past our read cap (or absent). Use
+# the widely-recognised Discord crawler UA by default so previews work for
+# these sites; it is overridable via config (URLPREVIEW --user-agent).
+DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"
 
 # Trailing characters that are rarely part of a URL (closing paren handled
 # separately so balanced parens inside a URL are preserved).

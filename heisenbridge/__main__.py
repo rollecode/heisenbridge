@@ -515,6 +515,7 @@ class BridgeAppService(AppService):
             logging.info("URL previews disabled")
             return
 
+        from heisenbridge.url_preview import DEFAULT_USER_AGENT
         from heisenbridge.url_preview import URLPreviewFetcher
 
         self.url_preview_fetcher = URLPreviewFetcher(
@@ -522,6 +523,7 @@ class BridgeAppService(AppService):
             embed_media=self.config.get("url_preview_embed_media", True),
             allowed_domains=self.config.get("url_preview_domains") or [],
             fetch_timeout=self._url_preview_timeout,
+            user_agent=self.config.get("url_preview_user_agent") or DEFAULT_USER_AGENT,
         )
         domains = self.config.get("url_preview_domains") or []
         logging.info(
@@ -682,6 +684,7 @@ class BridgeAppService(AppService):
             "url_previews": url_previews,
             "url_preview_embed_media": True,
             "url_preview_domains": [],
+            "url_preview_user_agent": None,
         }
         logging.debug(f"Default config: {self.config}")
         self.synapse_admin = False
