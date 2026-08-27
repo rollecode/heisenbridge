@@ -30,6 +30,7 @@ class ChannelRoom(PrivateRoom):
 
         self.key = None
         self.autocmd = None
+        self.names_requested = False
 
         # for migration the class default is full
         self.member_sync = "full"
@@ -277,6 +278,7 @@ class ChannelRoom(PrivateRoom):
         self.network.conn.mode(self.name, "")
 
     async def cmd_names(self, args) -> None:
+        self.names_requested = True
         self.network.conn.names(self.name)
 
     async def cmd_bans(self, args) -> None:
@@ -397,47 +399,52 @@ class ChannelRoom(PrivateRoom):
         if self.user_id in to_remove:
             to_remove.remove(self.user_id)
 
-        self.send_notice(
-            "Synchronizing members:"
-            + f" got {len(names)} from server,"
-            + f" {len(self.members)} in room,"
-            + f" {len(to_add)} will be invited and {len(to_remove)} removed."
-        )
+        if self.names_requested:
+            self.send_notice(
+                "Synchronizing members:"
+                + f" got {len(names)} from server,"
+                + f" {len(self.members)} in room,"
+                + f" {len(to_add)} will be invited and {len(to_remove)} removed."
+            )
 
-        # known common mode names
-        modenames = {
-            "~": "owner",
-            "&": "admin",
-            "@": "op",
-            "%": "half-op",
-            "+": "voice",
-        }
+            # known common mode names
+            modenames = {
+                "~": "owner",
+                "&": "admin",
+                "@": "op",
+                "%": "half-op",
+                "+": "voice",
+            }
 
-        # show modes from top to bottom
-        for mode, name in modenames.items():
-            if mode in modes:
-                nicks = sorted(modes[mode], key=str.casefold)
-                self.send_notice(f"Users with {name} ({mode}): {', '.join(nicks)}")
-                del modes[mode]
+            # show modes from top to bottom
+            for mode, name in modenames.items():
+                if mode in modes:
+                    nicks = sorted(modes[mode], key=str.casefold)
+                    self.send_notice(f"Users with {name} ({mode}): {', '.join(nicks)}")
+                    del modes[mode]
 
-        # show unknown modes
-        for mode, nicks in modes.items():
-            nicks = sorted(nicks, key=str.casefold)
-            self.send_notice(f"Users with '{mode}': {', '.join(nicks)}")
+            # show unknown modes
+            for mode, nicks in modes.items():
+                nicks = sorted(nicks, key=str.casefold)
+                self.send_notice(f"Users with '{mode}': {', '.join(nicks)}")
 
-        # show everyone else
-        if len(others) > 0:
-            others = sorted(others, key=str.casefold)
-            self.send_notice(f"Users: {', '.join(others)}")
+            # show everyone else
+            if len(others) > 0:
+                others = sorted(others, key=str.casefold)
+                self.send_notice(f"Users: {', '.join(others)}")
 
         if self.member_sync == "full":
             for irc_user_id, nick in to_add:
                 self._add_puppet(nick)
-        else:
+        elif self.names_requested:
             self.send_notice(f"Member sync is set to {self.member_sync}, skipping invites.")
 
         for irc_user_id in to_remove:
             self._remove_puppet(irc_user_id)
+
+        # only the NAMES command opts into the verbose breakdown; automatic
+        # post-join/reconnect resyncs stay silent
+        self.names_requested = False
 
         # trust the names reply is always up-to-date
         self.on_channel = on_channel
