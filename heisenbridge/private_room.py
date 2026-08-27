@@ -879,15 +879,30 @@ class PrivateRoom(Room):
                 finally:
                     return
 
-            # a plain-text "@nick ..." to an actual channel member reads as an
-            # IRC highlight, not a literal @nick
-            mention = re.match(r"^@([^\s:,]+)[\s:,]+(.+)$", event.content.body, re.DOTALL)
-            if mention and getattr(self, "is_on_channel", None) and self.is_on_channel(mention.group(1)):
-                event.content.body = f"{mention.group(1)}: {mention.group(2)}"
+            # a plain-text "@nick" naming an actual channel member reads as a
+            # literal @nick to IRC, strip the @ anywhere it appears so the
+            # nick highlights normally, and use "nick: " when it opens the line
+            if getattr(self, "is_on_channel", None):
+
+                def _strip_mention(m):
+                    word = m.group(1)
+                    wlen = len(word)
+                    while wlen > 0 and word[wlen - 1] in "?!:;,.":
+                        wlen -= 1
+                    nick, tail = word[:wlen], word[wlen:]
+                    return nick + tail if self.is_on_channel(nick) else m.group(0)
+
+                body = re.sub(r"(?:^|(?<=\s))@([^\s<]+)", _strip_mention, event.content.body)
+
+                lead = re.match(r"^([^\s:,]+)[\s:,]+(.+)$", body, re.DOTALL)
+                if event.content.body.startswith("@") and lead and self.is_on_channel(lead.group(1)):
+                    body = f"{lead.group(1)}: {lead.group(2)}"
+
+                event.content.body = body
                 if event.content.formatted_body:
-                    fmt_mention = re.match(r"^@([^\s:,]+)[\s:,]+(.+)$", event.content.formatted_body, re.DOTALL)
-                    if fmt_mention and fmt_mention.group(1) == mention.group(1):
-                        event.content.formatted_body = f"{mention.group(1)}: {fmt_mention.group(2)}"
+                    event.content.formatted_body = re.sub(
+                        r"(?:^|(?<=\s))@([^\s<]+)", _strip_mention, event.content.formatted_body
+                    )
 
             await self._send_message(event, self.network.conn.privmsg)
 
