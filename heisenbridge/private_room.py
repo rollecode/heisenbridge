@@ -879,6 +879,16 @@ class PrivateRoom(Room):
                 finally:
                     return
 
+            # a plain-text "@nick ..." to an actual channel member reads as an
+            # IRC highlight, not a literal @nick
+            mention = re.match(r"^@([^\s:,]+)[\s:,]+(.+)$", event.content.body, re.DOTALL)
+            if mention and getattr(self, "is_on_channel", None) and self.is_on_channel(mention.group(1)):
+                event.content.body = f"{mention.group(1)}: {mention.group(2)}"
+                if event.content.formatted_body:
+                    fmt_mention = re.match(r"^@([^\s:,]+)[\s:,]+(.+)$", event.content.formatted_body, re.DOTALL)
+                    if fmt_mention and fmt_mention.group(1) == mention.group(1):
+                        event.content.formatted_body = f"{mention.group(1)}: {fmt_mention.group(2)}"
+
             await self._send_message(event, self.network.conn.privmsg)
 
         await self.az.intent.send_receipt(event.room_id, event.event_id)
